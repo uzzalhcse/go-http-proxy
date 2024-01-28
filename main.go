@@ -1,38 +1,18 @@
 package main
 
 import (
-	"fmt"
-	"io"
+	"log"
 	"net/http"
-	"os"
+
+	"github.com/elazarl/goproxy"
 )
 
 func main() {
-	proxyServer := http.NewServeMux()
-	proxyServer.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Forward the request to the upstream server
-		upstreamServer := "https://example.com"
-		resp, err := http.Get(upstreamServer)
-		if err != nil {
-			fmt.Fprintf(w, "Error forwarding request: %v", err)
-			return
-		}
+	proxy := goproxy.NewProxyHttpServer()
+	proxy.Verbose = true
 
-		// Copy the response headers
-		for k, v := range resp.Header {
-			w.Header().Set(k, v[0])
-		}
+	http.Handle("/", proxy)
 
-		// Copy the response body
-		defer resp.Body.Close()
-		io.Copy(w, resp.Body)
-	})
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "3000"
-	}
-
-	fmt.Printf("Starting proxy server on port %s...\n", port)
-	http.ListenAndServe(":"+port, proxyServer)
+	log.Println("Server started at port 3000")
+	log.Fatal(http.ListenAndServe(":3000", proxy))
 }
