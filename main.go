@@ -1,30 +1,35 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/elazarl/goproxy"
 )
 
-func getServerIP() string {
-	// Get a list of all the system's unicast interface addresses.
-	addrs, err := net.InterfaceAddrs()
+func getPublicIP() (string, error) {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	resp, err := client.Get("https://httpbin.org/ip")
 	if err != nil {
-		log.Fatalf("Failed to get server IP: %v", err)
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Origin string `json:"origin"`
 	}
 
-	for _, addr := range addrs {
-		// Check the address type and if it's not a loopback, then return it.
-		if ipNet, ok := addr.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
-			if ipNet.IP.To4() != nil {
-				return ipNet.IP.String()
-			}
-		}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return "", err
 	}
 
-	return "Unable to determine server IP"
+	return result.Origin, nil
 }
 
 func getIP(r *http.Request) string {
@@ -44,14 +49,16 @@ func loggingMiddleware(proxy *goproxy.ProxyHttpServer) http.Handler {
 }
 
 func main() {
-	serverIP := getServerIP()
-	log.Printf("Server IP: %s", serverIP)
+	publicIP, err := getPublicIP()
+	if err != nil {
+		log.Fatalf("Failed to get public IP: %v", err)
+	}
 
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = true
 
 	http.Handle("/", loggingMiddleware(proxy))
 
-	log.Println("Server started at port 3000")
+	log.Printf("Server started at %s:3000", publicIP)
 	log.Fatal(http.ListenAndServe(":3000", nil))
 }
