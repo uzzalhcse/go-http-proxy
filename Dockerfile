@@ -8,6 +8,6 @@ RUN go get -d -v ./...
 
 RUN go build -o main .
 
-EXPOSE 80
+EXPOSE 3000
 
 CMD ["./main"]
